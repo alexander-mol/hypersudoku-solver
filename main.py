@@ -1,5 +1,7 @@
 import numpy as np
 import time
+import copy
+
 
 class HyperSudokuSolver:
     """
@@ -10,21 +12,43 @@ class HyperSudokuSolver:
         zero is a special character for 'empty cell'
     """
 
-    def __init__(self):
-        self.puzzle = np.array([
-            [0,0,0,0,0,0,0,1,0],
-            [0,0,2,0,0,0,0,3,4],
-            [0,0,0,0,5,1,0,0,0],
-            [0,0,0,0,0,6,5,0,0],
-            [0,7,0,3,0,0,0,8,0],
-            [0,0,3,0,0,0,0,0,0],
-            [0,0,0,0,8,0,0,0,0],
-            [5,8,0,0,0,0,9,0,0],
-            [6,9,0,0,0,0,0,0,0]
-        ])
+    def __init__(self, puzzle):
+        self.puzzle = copy.copy(puzzle)
         self.given = (self.puzzle != 0)
         self.done = False
+        self.iteration_count = 0
 
+    # not used
+    def count_options(self, r, c):
+        """
+        Count the number of remaining possible values for cell (r, c) given what is already set on the board.
+        """
+        values_taken = set()
+        values_taken = values_taken.union(set(self.puzzle[r].flatten()))  # row
+        values_taken = values_taken.union(set(self.puzzle[:, c].flatten()))  # column
+        # sector
+        r_sector = (r // 3) * 3
+        c_sector = (c // 3) * 3
+        values_taken = values_taken.union(set(self.puzzle[r_sector:r_sector + 3, c_sector:c_sector + 3].flatten()))
+        # hyper-sector
+        if r in [1, 2, 3, 5, 6, 7] and c in [1, 2, 3, 5, 6, 7]:
+            # in a hyper-sector
+            r_hyper_sector = (r > 4) * 4 + 1
+            c_hyper_sector = (c > 4) * 4 + 1
+            values_taken = values_taken.union(set(self.puzzle[r_hyper_sector:r_hyper_sector + 3,
+                                                  c_hyper_sector:c_hyper_sector + 3].flatten()))
+        return 10 - len(values_taken)
+
+    # not used
+    def score_orientation(self):
+        return self.count_options(0, 0)
+        score = 1
+        r, c = 0, -1
+        while r < 3:
+            r, c = self.increment(r, c)
+            score *= self.count_options(r, c)
+        return np.log(score)
+    
     @staticmethod
     def validate_segment(segment):
         """
@@ -41,6 +65,7 @@ class HyperSudokuSolver:
                 return False
         return True
 
+    # not used
     def full_validation(self):
         """
         Orchestrator to call validate_segment on all the necessary segments.
@@ -88,25 +113,35 @@ class HyperSudokuSolver:
         return True
 
     def increment(self, r, c):
+        """
+        Go to the next empty cell after r, c (in left-to-right order, going to the next row at the end of a line).
+        """
         c += 1
         if c >= 9:
             c = 0
             r += 1
-        if r < 9 and c  < 9 and self.given[r, c]:
+        if r < 9 and c < 9 and self.given[r, c]:
             r, c = self.increment(r, c)
         return r, c
 
     def check_done(self, r, c):
+        """
+        Check if the puzzle has been solved.
+        """
         if r > 8:
             self.done = True
 
     def fill(self, r, c):
+        """
+        Recursive method that performs the backtracking algorithm.
+        """
+        self.iteration_count += 1
         self.check_done(r, c)
         if self.done:
             return
         for value in range(1, 10):
             self.puzzle[r, c] = value
-            # print(self.puzzle)
+            # print(self.puzzle)  # for debugging
             if self.validate(r, c):
                 r_next, c_next = self.increment(r, c)
                 self.fill(r_next, c_next)
@@ -115,6 +150,10 @@ class HyperSudokuSolver:
         self.puzzle[r, c] = 0
 
     def solve(self):
+        """
+        Main method - starts solving process and reports performance metrics.
+        """
+        print('Started searching...')
         start_time = time.time()
         r, c = self.increment(0, -1)
         self.fill(r, c)
@@ -123,8 +162,44 @@ class HyperSudokuSolver:
             print(self.puzzle)
         else:
             print('No solution found.')
-        print(f'\nTime: {np.round(time.time() - start_time, 3)}s')
+        print(f'\nTime: {np.round(time.time() - start_time, 3)} s')
+        print(f'Iterations: {self.iteration_count}')
+        print(f'Avg time/iter: {np.round((time.time() - start_time) / self.iteration_count * 1e6, 0)} ns\n')
 
 if __name__ == '__main__':
-    hss = HyperSudokuSolver()
+    puzzle = np.array([
+        # [0,0,0,0,0,0,0,1,0],
+        # [0,0,2,0,0,0,0,3,4],
+        # [0,0,0,0,5,1,0,0,0],
+        # [0,0,0,0,0,6,5,0,0],
+        # [0,7,0,3,0,0,0,8,0],
+        # [0,0,3,0,0,0,0,0,0],
+        # [0,0,0,0,8,0,0,0,0],
+        # [5,8,0,0,0,0,9,0,0],
+        # [6,9,0,0,0,0,0,0,0]
+        [0, 0, 0, 0, 0, 0, 0, 7, 0],
+        [0, 0, 4, 0, 0, 0, 0, 0, 0],
+        [0, 0, 7, 0, 0, 8, 5, 0, 0],
+        [0, 0, 6, 0, 0, 0, 0, 2, 5],
+        [0, 0, 0, 0, 0, 0, 0, 0, 3],
+        [0, 0, 0, 8, 0, 0, 0, 1, 4],
+        [0, 0, 5, 0, 3, 0, 0, 9, 1],
+        [2, 1, 0, 9, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 5, 0]
+    ])
+    puzzle = np.flip(np.rot90(np.rot90(np.rot90(np.rot90(puzzle)))), 1)
+    hss = HyperSudokuSolver(puzzle)
+    print(f'Options (0,0): {hss.score_orientation()}')
+    hss.solve()
+    puzzle = np.rot90(np.rot90(np.rot90(puzzle)))
+    hss = HyperSudokuSolver(puzzle)
+    print(f'Options (0,0): {hss.score_orientation()}')
+    hss.solve()
+    puzzle = np.rot90(np.rot90(puzzle))
+    hss = HyperSudokuSolver(puzzle)
+    print(f'Options (0,0): {hss.score_orientation()}')
+    hss.solve()
+    puzzle = np.rot90(puzzle)
+    hss = HyperSudokuSolver(puzzle)
+    print(f'Options (0,0): {hss.score_orientation()}')
     hss.solve()
