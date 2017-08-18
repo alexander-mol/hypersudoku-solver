@@ -23,6 +23,8 @@ class HyperSudokuSolver:
         """
         Count the number of remaining possible values for cell (r, c) given what is already set on the board.
         """
+        if self.puzzle[r, c] != 0:
+            return 1
         values_taken = set()
         values_taken = values_taken.union(set(self.puzzle[r].flatten()))  # row
         values_taken = values_taken.union(set(self.puzzle[:, c].flatten()))  # column
@@ -41,10 +43,10 @@ class HyperSudokuSolver:
 
     # not used
     def score_orientation(self):
-        return self.count_options(0, 0)
+        # return self.count_options(0, 0)
         score = 1
         r, c = 0, -1
-        while r < 3:
+        while r < 1:
             r, c = self.increment(r, c)
             score *= self.count_options(r, c)
         return np.log(score)
@@ -187,19 +189,28 @@ if __name__ == '__main__':
         [2, 1, 0, 9, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 5, 0]
     ])
-    puzzle = np.flip(np.rot90(np.rot90(np.rot90(np.rot90(puzzle)))), 1)
-    hss = HyperSudokuSolver(puzzle)
-    print(f'Options (0,0): {hss.score_orientation()}')
-    hss.solve()
-    puzzle = np.rot90(np.rot90(np.rot90(puzzle)))
-    hss = HyperSudokuSolver(puzzle)
-    print(f'Options (0,0): {hss.score_orientation()}')
-    hss.solve()
-    puzzle = np.rot90(np.rot90(puzzle))
-    hss = HyperSudokuSolver(puzzle)
-    print(f'Options (0,0): {hss.score_orientation()}')
-    hss.solve()
-    puzzle = np.rot90(puzzle)
-    hss = HyperSudokuSolver(puzzle)
-    print(f'Options (0,0): {hss.score_orientation()}')
-    hss.solve()
+    # puzzle = np.flip(np.rot90(np.rot90(np.rot90(np.rot90(puzzle)))), 1)
+    # hss = HyperSudokuSolver(puzzle)
+    # print(f'Options (0,0): {hss.score_orientation()}')
+    # hss.solve()
+    # puzzle = np.rot90(np.rot90(np.rot90(puzzle)))
+    # hss = HyperSudokuSolver(puzzle)
+    # print(f'Options (0,0): {hss.score_orientation()}')
+    # hss.solve()
+    # puzzle = np.rot90(np.rot90(puzzle))
+    # hss = HyperSudokuSolver(puzzle)
+    # print(f'Options (0,0): {hss.score_orientation()}')
+    # hss.solve()
+    # puzzle = np.rot90(puzzle)
+    # hss = HyperSudokuSolver(puzzle)
+    # print(f'Options (0,0): {hss.score_orientation()}')
+    # hss.solve()
+
+    orientations = [puzzle, np.rot90(puzzle), np.rot90(np.rot90(puzzle)), np.rot90(np.rot90(np.rot90(puzzle)))]
+    from multiprocessing import Pool
+    pool = Pool(4)
+    for orientation in orientations:
+        solver = HyperSudokuSolver(orientation)
+        pool.apply_async(solver.solve)
+    pool.close()
+    pool.join()
