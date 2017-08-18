@@ -14,7 +14,6 @@ class HyperSudokuSolver:
 
     def __init__(self, puzzle):
         self.puzzle = copy.copy(puzzle)
-        self.given = (self.puzzle != 0)
         self.done = False
         self.iteration_count = 0
 
@@ -44,13 +43,16 @@ class HyperSudokuSolver:
     # not used
     def score_orientation(self):
         # return self.count_options(0, 0)
-        score = 1
-        r, c = 0, -1
-        while r < 1:
-            r, c = self.increment(r, c)
-            score *= self.count_options(r, c)
-        return np.log(score)
-    
+        score = 0
+        for r in range(7):
+            if r in [2, 5]:
+                continue
+            for c in range(6):
+                if r == 3 and c in [1, 2, 3, 5, 6, 7]:
+                    continue
+                score += np.log(self.count_options(r, c))
+        return score
+
     @staticmethod
     def validate_segment(segment):
         """
@@ -155,18 +157,45 @@ class HyperSudokuSolver:
         """
         Main method - starts solving process and reports performance metrics.
         """
+        self.given = (self.puzzle != 0)
         print('Started searching...')
-        start_time = time.time()
+        self.start_time = time.time()
         r, c = self.increment(0, -1)
         self.fill(r, c)
+
+    def print_outputs(self):
         if self.done:
             print('Found solution:')
             print(self.puzzle)
         else:
             print('No solution found.')
-        print(f'\nTime: {np.round(time.time() - start_time, 3)} s')
+        print(f'\nTime: {np.round(time.time() - self.start_time, 3)} s')
         print(f'Iterations: {self.iteration_count}')
-        print(f'Avg time/iter: {np.round((time.time() - start_time) / self.iteration_count * 1e6, 0)} ns\n')
+        print(f'Avg time/iter: {np.round((time.time() - self.start_time) / self.iteration_count * 1e6, 0)} ns\n')
+
+    def solve_smart(self):
+        score_list = []
+        for flips in range(2):
+            for rotations in range(4):
+                self.puzzle = self.transform(self.puzzle, flips, rotations)
+                score_list.append((self.score_orientation(), flips, rotations))
+                self.puzzle = self.transform(self.puzzle, flips, (4 - rotations) % 4)
+        score_list.sort(key=lambda x: x[0])
+        flips = score_list[0][1]
+        rotations = score_list[0][2]
+        self.puzzle = self.transform(self.puzzle, flips, rotations)
+        self.solve()
+        self.puzzle = self.transform(self.puzzle, flips, (4 - rotations) % 4)
+        self.print_outputs()
+
+    @staticmethod
+    def transform(array, flips, rotations):
+        for i in range(flips):
+            array = np.flip(array, 1)
+        for i in range(rotations):
+            array = np.rot90(array)
+        return array
+
 
 if __name__ == '__main__':
     puzzle = np.array([
@@ -189,28 +218,33 @@ if __name__ == '__main__':
         [2, 1, 0, 9, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 5, 0]
     ])
-    # puzzle = np.flip(np.rot90(np.rot90(np.rot90(np.rot90(puzzle)))), 1)
+    hss = HyperSudokuSolver(puzzle)
+    hss.solve_smart()
+
+    # puzzle = np.rot90(np.rot90(np.rot90(np.rot90(puzzle))))
     # hss = HyperSudokuSolver(puzzle)
     # print(f'Options (0,0): {hss.score_orientation()}')
-    # hss.solve()
+    # # hss.solve()
     # puzzle = np.rot90(np.rot90(np.rot90(puzzle)))
     # hss = HyperSudokuSolver(puzzle)
     # print(f'Options (0,0): {hss.score_orientation()}')
-    # hss.solve()
+    # # hss.solve()
     # puzzle = np.rot90(np.rot90(puzzle))
     # hss = HyperSudokuSolver(puzzle)
     # print(f'Options (0,0): {hss.score_orientation()}')
-    # hss.solve()
+    # # hss.solve()
     # puzzle = np.rot90(puzzle)
     # hss = HyperSudokuSolver(puzzle)
     # print(f'Options (0,0): {hss.score_orientation()}')
-    # hss.solve()
+    # # hss.solve()
 
-    orientations = [puzzle, np.rot90(puzzle), np.rot90(np.rot90(puzzle)), np.rot90(np.rot90(np.rot90(puzzle)))]
-    from multiprocessing import Pool
-    pool = Pool(4)
-    for orientation in orientations:
-        solver = HyperSudokuSolver(orientation)
-        pool.apply_async(solver.solve)
-    pool.close()
-    pool.join()
+    # orientations = [puzzle, np.rot90(puzzle), np.rot90(np.rot90(puzzle)), np.rot90(np.rot90(np.rot90(puzzle)))]
+    # from multiprocessing import Pool
+    # pool = Pool(8)
+    # for orientation in orientations:
+    #     solver = HyperSudokuSolver(orientation)
+    #     pool.apply_async(solver.solve)
+    #     solver = HyperSudokuSolver(np.flip(orientation, 1))
+    #     pool.apply_async(solver.solve)
+    # pool.close()
+    # pool.join()
